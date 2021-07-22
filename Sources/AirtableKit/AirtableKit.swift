@@ -62,13 +62,19 @@ public final class Airtable {
     ///
     /// It works, with no error checking though
     
-    private func loadPage( tableName: String, fields: [String] = [], view: String? = nil, withOffset offset: String?) -> AnyPublisher<AirtableResponse, AirtableError>  {
+    private func loadPage( tableName: String, fields: [String] = [], view: String? = nil, filter: String? = nil, withOffset offset: String?) -> AnyPublisher<AirtableResponse, AirtableError>  {
       // this would be the individual network call
         var queryItems = fields.isEmpty ? nil : fields.map { URLQueryItem(name: "fields[]", value: $0) }
         if queryItems != nil {
             if let v = view {
                 let vqi = URLQueryItem(name: "view", value: v)
                 queryItems?.insert(vqi, at: 0)
+            }
+            
+            if let f = filter {
+                //filterByFormula=NOT%28%7BName%7D%20%3D%20%27%27%29 -> NOT({Name} = '')
+                let fqi = URLQueryItem(name: "filterByFormula", value: f)
+                queryItems?.insert(fqi, at: 0)
             }
         }
         let request = buildRequest(method: "GET", path: tableName, queryItems: queryItems , offset: offset )
@@ -86,13 +92,13 @@ public final class Airtable {
     }
 
     @available(iOS 14.0, *)
-    public func listAllRecords(tableName: String, fields: [String] = [], view: String? = nil) -> AnyPublisher<[Record], AirtableError> {
+    public func listAllRecords(tableName: String, fields: [String] = [], view: String? = nil, filter: String? = nil) -> AnyPublisher<[Record], AirtableError> {
         
         let pageOffsetPublisher = CurrentValueSubject<String?, Never>(nil)
 
         return pageOffsetPublisher
           .flatMap({ offset in
-            return self.loadPage( tableName: tableName, fields: fields, view: view, withOffset: offset)
+            return self.loadPage( tableName: tableName, fields: fields, view: view, filter: filter, withOffset: offset)
           })
           .handleEvents(receiveOutput: { (response: AirtableResponse) in
             if response.offset != nil {
